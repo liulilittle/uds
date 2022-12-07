@@ -1,0 +1,61 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0) 
+
+SET(NAME uds)
+PROJECT(${NAME} C CXX) # CMAKE_CURRENT_SOURCE_DIR
+
+SET(CMAKE_C_FLAGS "-Wno-format-overflow -fPIE -fvisibility=hidden")
+SET(CMAKE_CXX_FLAGS "-Wno-format-overflow -fPIE -fvisibility=hidden")
+
+ADD_DEFINITIONS(-DLINUX)
+ADD_DEFINITIONS(-DJEMALLOC)
+
+# C
+IF(BT MATCHES "Debug" OR CMAKE_BUILD_TYPE STREQUAL Debug)
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_DEBUG -g")
+ELSE()
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+ENDIF()
+
+# C/CXX
+IF(BT MATCHES "Debug" OR CMAKE_BUILD_TYPE STREQUAL Debug)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_DEBUG -g")
+ELSE()
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+ENDIF()
+SET(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -rdynamic -Wl,-Bstatic") # -rdynamic -Wl,-Bstatic -Wl,-Bdynamic -lstdc++ -lpthread -ldl -lz -lrt
+
+INCLUDE(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+
+# CXX11
+IF(COMPILER_SUPPORTS_CXX11)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+ELSEIF(COMPILER_SUPPORTS_CXX0X)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+ELSE()
+    MESSAGE(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+ENDIF()
+
+SET(PROJECT_REFERENCES_ROOT /home/ubuntu/build)
+
+INCLUDE_DIRECTORIES(
+    ${PROJECT_SOURCE_DIR}
+    ${PROJECT_REFERENCES_ROOT}/boost
+    ${PROJECT_REFERENCES_ROOT}/openssl/include
+    ${PROJECT_REFERENCES_ROOT}/jemalloc/include
+)
+
+LINK_DIRECTORIES(
+    ${PROJECT_REFERENCES_ROOT}/boost/stage/lib
+    ${PROJECT_REFERENCES_ROOT}/openssl
+    ${PROJECT_REFERENCES_ROOT}/jemalloc/lib
+)
+
+FILE(GLOB_RECURSE SOURCE_FILES main.cpp uds/*.c uds/*.cpp)
+
+ADD_EXECUTABLE(${NAME} ${SOURCE_FILES})
+
+SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+
+TARGET_LINK_LIBRARIES(${NAME} libc.a jemalloc libssl.a libcrypto.a dl pthread boost_system boost_coroutine boost_thread boost_context) 
