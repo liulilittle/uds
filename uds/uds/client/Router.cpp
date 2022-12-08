@@ -107,12 +107,12 @@ namespace uds {
         }
 
         bool Router::AcceptClient(const AsioContext& context, const AsioTcpSocket& socket) noexcept {
-            static const auto ClearTimeout = [](const auto& timeout) noexcept {
+            static const auto ClearTimeout = [](const TimeoutPtr& timeout) noexcept {
                 if (timeout) {
                     uds::threading::ClearTimeout(constantof(timeout));
                 }
             };
-            static const auto ClearTimeoutIfNotSuccess = [](auto success, const auto& timeout) noexcept {
+            static const auto ClearTimeoutIfNotSuccess = [](bool success, const TimeoutPtr& timeout) noexcept {
                 if (!success) {
                     ClearTimeout(timeout);
                 }
