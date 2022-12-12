@@ -93,7 +93,7 @@ namespace uds {
                     const ITransmissionPtr inbound = transmission;
                     if (handshaked) {
                         handshaked = Connection::AcceptAsync(inbound, configuration_->Alignment,
-                            [references, this, inbound, network](const ITransmissionPtr& inbound) noexcept -> int {
+                            [references, this, network](const ITransmissionPtr& inbound) noexcept -> int {
                                 ConnectionChannelPtr channel = AllocChannel(network, inbound);
                                 if (!channel) {
                                     return 0;
