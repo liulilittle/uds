@@ -2,16 +2,13 @@
 
 namespace uds {
     namespace cryptography {
-        Encryptor::Encryptor(bool stream, const std::string& method, const std::string& password) noexcept
+        Encryptor::Encryptor(const std::string& method, const std::string& password) noexcept
             : _cipher(NULL)
-            , _stream(stream)
             , _method(method)
             , _password(password) {
             initKey(method, password);
-            if (!stream) {
-                initCipher(_encryptCTX, 1, 1);
-                initCipher(_decryptCTX, 0, 1);
-            }
+            initCipher(_encryptCTX, 1, 1);
+            initCipher(_decryptCTX, 0, 1);
         }
 
         void Encryptor::initKey(const std::string& method, const std::string password) {
@@ -79,36 +76,7 @@ namespace uds {
             }
 
             std::shared_ptr<EVP_CIPHER_CTX>& context = _decryptCTX;
-            if (_stream) {
-                if (NULL == context) {
-                    if (!initCipher(context, 0, 0)) {
-                        return NULL;
-                    }
-
-                    int ivlen = EVP_CIPHER_iv_length(_cipher);
-                    if (datalen < ivlen) {
-                        return NULL;
-                    }
-
-                    _iv = make_shared_alloc<Byte>(ivlen);
-                    if (NULL == _iv) {
-                        return NULL;
-                    }
-
-                    memcpy(_iv.get(), data, ivlen);
-                    data += ivlen;
-                    datalen -= ivlen;
-                    if (datalen < 1) {
-                        return NULL;
-                    }
-
-                    // INIT-CTX
-                    if (EVP_CipherInit_ex(context.get(), _cipher, NULL, _key.get(), _iv.get(), 0) < 1) {
-                        return NULL;
-                    }
-                }
-            }
-            elif(EVP_CipherInit_ex(context.get(), _cipher, NULL, _key.get(), _iv.get(), 0) < 1) { // INIT-CTX
+            if (EVP_CipherInit_ex(context.get(), _cipher, NULL, _key.get(), _iv.get(), 0) < 1) { // INIT-CTX
                 return NULL;
             }
 
@@ -141,52 +109,7 @@ namespace uds {
             }
 
             std::shared_ptr<EVP_CIPHER_CTX>& context = _encryptCTX;
-            if (_stream) {
-                if (NULL == context) {
-                    if (!initCipher(context, 1, 0)) {
-                        return NULL;
-                    }
-
-                    int ivlen = EVP_CIPHER_iv_length(_cipher);
-                    if (ivlen < 1) {
-                        return NULL;
-                    }
-
-                    _iv = make_shared_alloc<Byte>(ivlen);
-                    if (NULL == _iv) {
-                        return NULL;
-                    }
-
-                    if (RAND_bytes(_iv.get(), ivlen) < 1) {
-                        return NULL;
-                    }
-
-                    // INIT-CTX
-                    if (EVP_CipherInit_ex(context.get(), _cipher, NULL, _key.get(), _iv.get(), 1) < 1) {
-                        return NULL;
-                    }
-
-                    int messages_size;
-                    std::shared_ptr<Byte> messages = Encrypt(data, datalen, messages_size);
-                    if (NULL == messages) {
-                        return NULL;
-                    }
-
-                    int totlen = ivlen + messages_size;
-                    std::shared_ptr<Byte> content = make_shared_object<Byte>(totlen);
-                    if (NULL == content) {
-                        return NULL;
-                    }
-                    else {
-                        memcpy(content.get(), _iv.get(), ivlen);
-                        memcpy(content.get() + ivlen, messages.get(), messages_size);
-                    }
-
-                    outlen = totlen;
-                    return content;
-                }
-            }
-            elif(EVP_CipherInit_ex(context.get(), _cipher, NULL, _key.get(), _iv.get(), 1) < 1) { // INIT-CTX
+            if (EVP_CipherInit_ex(context.get(), _cipher, NULL, _key.get(), _iv.get(), 1) < 1) { // INIT-CTX
                 return NULL;
             }
 

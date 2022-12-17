@@ -6,7 +6,7 @@ namespace uds {
     namespace cryptography {
         class Encryptor final {
         public:
-            Encryptor(bool stream, const std::string& method, const std::string& password) noexcept;
+            Encryptor(const std::string& method, const std::string& password) noexcept;
 
         public:
             static void                                         Initialize() noexcept;
@@ -22,7 +22,6 @@ namespace uds {
 
         private:
             const EVP_CIPHER*                                   _cipher;
-            bool                                                _stream;
             std::shared_ptr<Byte>                               _key; // _cipher->key_len
             std::shared_ptr<Byte>                               _iv;
             std::string                                         _method;

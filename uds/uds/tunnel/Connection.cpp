@@ -353,7 +353,7 @@ namespace uds {
                 return false;
             }
             
-            Char messages[1 << 12];
+            Char messages[uds::threading::Hosting::BufferSize];
             int messages_size = RandomNext(UINT8_MAX << 1, std::min<int>(alignment, sizeof(messages)));
             for (int i = 0; i < messages_size; i++) {
                 messages[i] = RandomAscii();

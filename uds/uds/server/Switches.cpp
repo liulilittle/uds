@@ -102,7 +102,6 @@ namespace uds {
                                 int channelId = channel->channel_;
                                 if (!AddTimeout(network.get(), uds::threading::SetTimeout(hosting_,
                                     [references, this, channel, channelId, network](void* key) noexcept -> void {
-                                        channel->Close();
                                         ClearTimeout(key);
                                         CloseChannel(channelId);
                                     }, (UInt64)configuration_->Connect.Timeout * 1000))) {
@@ -113,8 +112,8 @@ namespace uds {
                             },
                             [references, this, inbound, network](bool success, int channelId) noexcept -> void {
                                 if (!success) { 
-                                    CloseChannel(channelId);
                                     ClearTimeout(network.get());
+                                    CloseChannel(channelId);
                                 }
                             });
                         if (!handshaked) {
@@ -138,8 +137,8 @@ namespace uds {
                     if (handshaked) {
                         handshaked = AddTimeout(outbound.get(), uds::threading::SetTimeout(hosting_,
                             [references, this, outbound](void* key) noexcept -> void {
-                                outbound->Close();
                                 ClearTimeout(key);
+                                outbound->Close();
                             }, (UInt64)configuration_->Connect.Timeout * 1000));
                         handshaked = handshaked && Connection::AcceptAsync(transmission,
                             [references, this, outbound](bool success, int channelId) noexcept -> void {
@@ -261,29 +260,29 @@ namespace uds {
                 return false;
             }
 
-            const std::shared_ptr<Reference> sreference = GetReference();
-            const std::shared_ptr<uds::transmission::ITransmission> stransmission = transmission;
+            const std::shared_ptr<Reference> reference = GetReference();
+            const std::shared_ptr<uds::transmission::ITransmission> network = transmission;
             const HandshakeAsyncCallback scallback = callback;
 
-            if (!AddTimeout(stransmission.get(), uds::threading::SetTimeout(hosting_,
-                [sreference, this, stransmission, scallback](void*) noexcept {
-                    stransmission->Close();
+            if (!AddTimeout(network.get(), uds::threading::SetTimeout(hosting_,
+                [reference, this, network, scallback](void* key) noexcept {
+                    ClearTimeout(key);
+                    network->Close();
                     scallback(NULL, false);
-                    ClearTimeout(stransmission.get());
                 }, (UInt64)configuration_->Handshake.Timeout * 1000))) {
                 return false;
             }
 
-            return stransmission->HandshakeAsync(uds::transmission::ITransmission::HandshakeType_Server, /* In order to extend the transport layer medium. */
-                [sreference, this, stransmission, scallback](bool handshaked) noexcept {
+            return transmission->HandshakeAsync(uds::transmission::ITransmission::HandshakeType_Server, /* In order to extend the transport layer medium. */
+                [reference, this, network, scallback](bool handshaked) noexcept {
+                    ClearTimeout(network.get());
                     if (handshaked) {
-                        scallback(stransmission, handshaked);
+                        scallback(network, handshaked);
                     }
                     else {
-                        stransmission->Close();
+                        network->Close();
                         scallback(NULL, handshaked);
                     }
-                    ClearTimeout(stransmission.get());
                 });
         }
 

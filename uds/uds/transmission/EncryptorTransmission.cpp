@@ -10,7 +10,7 @@ namespace uds {
             const std::string&                                          password,
             int                                                         alignment) noexcept
             : Transmission(hosting, context, socket, alignment)
-            , encryptor_(true, method, password) {
+            , encryptor_(method, password) {
             
         }
 
