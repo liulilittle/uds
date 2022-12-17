@@ -78,7 +78,7 @@ namespace uds {
         }
 
         bool SslSocketTransmission::OnWriteAsync(const BOOST_ASIO_MOVE_ARG(pmessage) message) noexcept {
-            const std::shared_ptr<Reference> reference = GetReference();
+            const std::shared_ptr<ITransmission> reference = GetReference();
             const pmessage messages = BOOST_ASIO_MOVE_CAST(pmessage)(constantof(message));
 
             boost::asio::async_write(*ssl_socket_, boost::asio::buffer(messages->packet.get(), messages->packet_size),
@@ -104,7 +104,7 @@ namespace uds {
                     Transmission::Dispose();
                 }
                 else {
-                    const std::shared_ptr<Reference> reference = GetReference();
+                    const std::shared_ptr<ITransmission> reference = GetReference();
                     ssl_socket->async_shutdown(
                         [reference, this, ssl_socket](const boost::system::error_code& ec_) noexcept {
                             Transmission::Dispose();
@@ -174,9 +174,9 @@ namespace uds {
                 std::shared_ptr<SslSocketTransmission> transmission_;
             };
 
-            std::shared_ptr<SslSocketTransmission> transmission = CastReference<SslSocketTransmission>(GetReference());
+            std::shared_ptr<SslSocketTransmission> transmission = Reference::CastReference<SslSocketTransmission>(GetReference());
             std::shared_ptr<AsyncSslSocket> accept =
-                NewReference<AsyncSslSocket>(transmission, GetSocket(), ssl_context_, ssl_socket_, verify_peer_, host_, certificate_file_, certificate_key_file_, certificate_chain_file_, certificate_key_password_, ciphersuites_);
+                Reference::NewReference<AsyncSslSocket>(transmission, GetSocket(), ssl_context_, ssl_socket_, verify_peer_, host_, certificate_file_, certificate_key_file_, certificate_chain_file_, certificate_key_password_, ciphersuites_);
             return accept->HandshakeAsync(type, forward0f(callback));
         }
         

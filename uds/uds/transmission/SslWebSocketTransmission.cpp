@@ -86,7 +86,7 @@ namespace uds {
 
         void SslWebSocketTransmission::Dispose() noexcept {
             if (!disposed_.exchange(true)) {
-                const std::shared_ptr<Reference> reference = GetReference();
+                const std::shared_ptr<ITransmission> reference = GetReference();
                 if (!ssl_websocket_) {
                     Transmission::Dispose();
                 }
@@ -213,14 +213,14 @@ namespace uds {
                 std::shared_ptr<SslWebSocketTransmission> transmission_;
             };
 
-            std::shared_ptr<SslWebSocketTransmission> transmission = CastReference<SslWebSocketTransmission>(GetReference());
+            std::shared_ptr<SslWebSocketTransmission> transmission = Reference::CastReference<SslWebSocketTransmission>(GetReference());
             std::shared_ptr<AsyncSslvWebSocket> accept =
-                NewReference<AsyncSslvWebSocket>(transmission, GetSocket(), ssl_context_, ssl_websocket_, verify_peer_, host_, path_, certificate_file_, certificate_key_file_, certificate_chain_file_, certificate_key_password_, ciphersuites_);
+                Reference::NewReference<AsyncSslvWebSocket>(transmission, GetSocket(), ssl_context_, ssl_websocket_, verify_peer_, host_, path_, certificate_file_, certificate_key_file_, certificate_chain_file_, certificate_key_password_, ciphersuites_);
             return accept->HandshakeAsync(type, forward0f(callback));
         }
 
         bool SslWebSocketTransmission::OnWriteAsync(const BOOST_ASIO_MOVE_ARG(pmessage) message) noexcept {
-            const std::shared_ptr<Reference> reference = GetReference();
+            const std::shared_ptr<ITransmission> reference = GetReference();
             const pmessage messages = BOOST_ASIO_MOVE_CAST(pmessage)(constantof(message));
 
             ssl_websocket_->async_write(boost::asio::buffer(messages->packet.get(), messages->packet_size),

@@ -54,7 +54,7 @@ namespace uds {
             }
 
             const HandshakeAsyncCallback callback_ = BOOST_ASIO_MOVE_CAST(HandshakeAsyncCallback)(constantof(callback));
-            const std::shared_ptr<Reference> reference_ = GetReference();
+            const std::shared_ptr<ITransmission> reference_ = GetReference();
 
             boost::asio::post(*context_,
                 [reference_, this, callback_]() noexcept {
@@ -86,7 +86,6 @@ namespace uds {
         }
 
         void Transmission::OnAddWriteAsync(const BOOST_ASIO_MOVE_ARG(pmessage) message) noexcept {
-            const std::shared_ptr<Reference> reference = GetReference();
             const pmessage messages = BOOST_ASIO_MOVE_CAST(pmessage)(constantof(message));
 
             messages_.push_back(messages);
@@ -101,7 +100,7 @@ namespace uds {
         }
 
         bool Transmission::OnWriteAsync(const BOOST_ASIO_MOVE_ARG(pmessage) message) noexcept {
-            const std::shared_ptr<Reference> reference = GetReference();
+            const std::shared_ptr<ITransmission> reference = GetReference();
             const pmessage messages = BOOST_ASIO_MOVE_CAST(pmessage)(constantof(message));
 
             boost::asio::async_write(*socket_, boost::asio::buffer(messages->packet.get(), messages->packet_size),
@@ -134,7 +133,7 @@ namespace uds {
                 return false;
             }
 
-            std::shared_ptr<Reference> reference = GetReference();
+            std::shared_ptr<ITransmission> reference = GetReference();
             pmessage message = std::move(*tail);
 
             messages_.erase(tail); // 从消息队列中删除这条消息

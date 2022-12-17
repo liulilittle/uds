@@ -58,9 +58,9 @@ namespace uds {
                 std::shared_ptr<WebSocketTransmission> transmission_;
             };
 
-            std::shared_ptr<WebSocketTransmission> transmission = CastReference<WebSocketTransmission>(GetReference());
+            std::shared_ptr<WebSocketTransmission> transmission = Reference::CastReference<WebSocketTransmission>(GetReference());
             std::shared_ptr<AcceptWebSocket> accept =
-                NewReference<AcceptWebSocket>(transmission, websocket_, host_, path_);
+                Reference::NewReference<AcceptWebSocket>(transmission, websocket_, host_, path_);
             return accept->HandshakeAsync(type, forward0f(callback));
         }
 
@@ -179,7 +179,7 @@ namespace uds {
         }
 
         bool WebSocketTransmission::OnWriteAsync(const BOOST_ASIO_MOVE_ARG(pmessage) message) noexcept {
-            const std::shared_ptr<Reference> reference = GetReference();
+            const std::shared_ptr<ITransmission> reference = GetReference();
             const pmessage messages = BOOST_ASIO_MOVE_CAST(pmessage)(constantof(message));
 
             websocket_.async_write(boost::asio::buffer(messages->packet.get(), messages->packet_size),
@@ -208,7 +208,7 @@ namespace uds {
 
         void WebSocketTransmission::Dispose() noexcept {
             if (!disposed_.exchange(true)) {
-                const std::shared_ptr<Reference> reference = GetReference();
+                const std::shared_ptr<ITransmission> reference = GetReference();
                 websocket_.async_close(boost::beast::websocket::close_code::normal,
                     [reference, this](const boost::system::error_code& ec_) noexcept {
                         Transmission::Dispose();

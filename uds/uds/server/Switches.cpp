@@ -300,9 +300,10 @@ namespace uds {
         }
 
         Switches::ITransmissionPtr Switches::CreateTransmission(const AsioContext& context, const AsioTcpSocket& socket) noexcept {
+            std::shared_ptr<uds::transmission::ITransmission> transmission;
             if (configuration_->Protocol == AppConfiguration::ProtocolType_SSL ||
                 configuration_->Protocol == AppConfiguration::ProtocolType_TLS) {
-                return NewReference2<uds::transmission::ITransmission, uds::transmission::SslSocketTransmission>(hosting_, context, socket,
+                transmission = NewReference2<uds::transmission::ITransmission, uds::transmission::SslSocketTransmission>(hosting_, context, socket,
                     configuration_->Protocols.Ssl.Host,
                     configuration_->Protocols.Ssl.CertificateFile,
                     configuration_->Protocols.Ssl.CertificateKeyFile,
@@ -312,20 +313,20 @@ namespace uds {
                     configuration_->Alignment);
             }
             elif(configuration_->Protocol == AppConfiguration::ProtocolType_Encryptor) {
-                return NewReference2<uds::transmission::ITransmission, uds::transmission::EncryptorTransmission>(hosting_, context, socket,
+                transmission = NewReference2<uds::transmission::ITransmission, uds::transmission::EncryptorTransmission>(hosting_, context, socket,
                     configuration_->Protocols.Encryptor.Method,
                     configuration_->Protocols.Encryptor.Password,
                     configuration_->Alignment);
             }
             elif(configuration_->Protocol == AppConfiguration::ProtocolType_WebSocket) {
-                return NewReference2<uds::transmission::ITransmission, uds::transmission::WebSocketTransmission>(hosting_, context, socket,
+                transmission = NewReference2<uds::transmission::ITransmission, uds::transmission::WebSocketTransmission>(hosting_, context, socket,
                     configuration_->Protocols.WebSocket.Host,
                     configuration_->Protocols.WebSocket.Path,
                     configuration_->Alignment);
             }
             elif(configuration_->Protocol == AppConfiguration::ProtocolType_WebSocket_SSL ||
                 configuration_->Protocol == AppConfiguration::ProtocolType_WebSocket_TLS) {
-                return NewReference2<uds::transmission::ITransmission, uds::transmission::SslWebSocketTransmission>(hosting_, context, socket,
+                transmission = NewReference2<uds::transmission::ITransmission, uds::transmission::SslWebSocketTransmission>(hosting_, context, socket,
                     configuration_->Protocols.WebSocket.Host,
                     configuration_->Protocols.WebSocket.Path,
                     configuration_->Protocols.Ssl.CertificateFile,
@@ -336,8 +337,9 @@ namespace uds {
                     configuration_->Alignment);
             }
             else {
-                return NewReference2<uds::transmission::ITransmission, uds::transmission::Transmission>(hosting_, context, socket, configuration_->Alignment);
+                transmission = NewReference2<uds::transmission::ITransmission, uds::transmission::Transmission>(hosting_, context, socket, configuration_->Alignment);
             }
+            return transmission->Constructor(transmission);
         }
 
         Switches::ConnectionPtr Switches::CreateConnection(int channel, const ITransmissionPtr& inbound, const ITransmissionPtr& outbound) noexcept {

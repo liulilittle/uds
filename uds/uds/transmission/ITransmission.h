@@ -5,7 +5,7 @@
 
 namespace uds {
     namespace transmission {
-        class ITransmission : public IDisposable {
+        class ITransmission {
         public:
             typedef std::function<void(const std::shared_ptr<Byte>&, int)>      ReadAsyncCallback;
             typedef std::function<void(bool)>                                   WriteAsyncCallback;
@@ -16,10 +16,14 @@ namespace uds {
             }                                                                   HandshakeType;
 
         public:
-            virtual                                                             ~ITransmission() noexcept override;
-
+                                                                                ITransmission() noexcept;
+            virtual                                                             ~ITransmission() noexcept;
+            
         public:
+            std::shared_ptr<ITransmission>                                      GetReference() noexcept;
             void                                                                Close() noexcept;
+            virtual void                                                        Dispose() = 0;
+            virtual std::shared_ptr<ITransmission>                              Constructor(const std::shared_ptr<ITransmission>& reference);
 
         public:
             virtual bool                                                        HandshakeAsync(
@@ -37,6 +41,9 @@ namespace uds {
             virtual std::shared_ptr<boost::asio::io_context>                    GetContext() = 0;
             virtual uds::net::IPEndPoint                                        GetLocalEndPoint() = 0;
             virtual uds::net::IPEndPoint                                        GetRemoteEndPoint() = 0;
+
+        private:
+            std::weak_ptr<ITransmission>                                        reference_;
         };
     }
 }

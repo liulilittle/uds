@@ -30,12 +30,12 @@ namespace uds {
             }
             else {
                 boost::asio::ip::tcp::endpoint remoteEP;
-                AsyncTcpSocketPtr socket = NewRemoteSocket(remoteEP);
+                const AsyncTcpSocketPtr socket = NewRemoteSocket(remoteEP);
                 if (!socket) {
                     return false;
                 }
 
-                std::shared_ptr<Reference> references = GetReference();
+                const std::shared_ptr<Reference> references = GetReference();
                 socket->async_connect(remoteEP,
                     [references, this](const boost::system::error_code& ec) noexcept {
                         if (!ec) {
@@ -161,17 +161,17 @@ namespace uds {
 
         void Connection::Dispose() noexcept {
             if (!disposed_.exchange(true)) {
-                ITransmissionPtr inbound = std::move(inbound_);
+                const ITransmissionPtr inbound = std::move(inbound_);
                 if (inbound) {
                     inbound->Close();
                 }
 
-                ITransmissionPtr outbound = std::move(outbound_);
+                const ITransmissionPtr outbound = std::move(outbound_);
                 if (outbound) {
                     outbound->Close();
                 }
 
-                AsyncTcpSocketPtr remote = std::move(remote_);
+                const AsyncTcpSocketPtr remote = std::move(remote_);
                 if (remote) {
                     Socket::Closesocket(*remote);
                 }
