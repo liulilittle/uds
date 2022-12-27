@@ -26,6 +26,7 @@ namespace uds {
             using ConnectClientAsyncCallback                                    = std::function<bool(const std::shared_ptr<boost::asio::ip::tcp::socket>&, bool)>;
             using ConnectTransmissionAsyncCallback                              = std::function<bool(const ITransmissionPtr&)>;
             using ConnectConnectionAsyncCallback                                = std::function<bool(const ITransmissionPtr&, int)>;
+            using ResolveAddressAsyncCallback                                   = std::function<void(const boost::asio::ip::tcp::endpoint&)>;
 
         public:
             Router(const std::shared_ptr<uds::threading::Hosting>& hosting, const std::shared_ptr<uds::configuration::AppConfiguration>& configuration) noexcept;
@@ -53,6 +54,7 @@ namespace uds {
             bool                                                                ConnectClient(const AsioContext& context, const boost::asio::ip::tcp::endpoint& remoteEP, ConnectClientAsyncCallback&& callback) noexcept;
             bool                                                                ConnectTransmission(const AsioContext& context, const boost::asio::ip::tcp::endpoint& remoteEP, ConnectTransmissionAsyncCallback&& callback) noexcept;
             bool                                                                ConnectConnection(const AsioContext& context, int channelId, const boost::asio::ip::tcp::endpoint& remoteEP, ConnectConnectionAsyncCallback&& callback) noexcept;
+            bool                                                                ResolveAddress(bool domain, const std::string& hostname, int port, ResolveAddressAsyncCallback&& callback) noexcept;
 
         public:
             virtual bool                                                        Listen() noexcept;
@@ -70,6 +72,7 @@ namespace uds {
             std::shared_ptr<uds::configuration::AppConfiguration>               configuration_;
             std::shared_ptr<boost::asio::io_context>                            context_;
             std::shared_ptr<boost::asio::ip::tcp::acceptor>                     acceptor_;
+            std::shared_ptr<boost::asio::ip::tcp::resolver>                     resolver_;
             TimeoutTable                                                        timeouts_;
             ConnectionTable                                                     connections_;
         };

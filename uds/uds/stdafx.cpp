@@ -260,45 +260,62 @@ namespace uds {
         std::string key2 = key1 + " ";
         key1.append("=");
         
+        std::string line;
         for (int i = 1; i < argc; i++) {
-            std::string line = argv[i];
-            if (line.empty()) {
-                continue;
-            }
-
-            std::string* key = addressof(key1);
-            std::size_t L = line.find(*key);
-            if (L == std::string::npos) {
-                key = addressof(key2);
-                L = line.find(*key);
-                if (L == std::string::npos) {
-                    continue;
-                }
-            }
-            elif(L) {
-                char ch = line[L - 1];
-                if (ch != ' ') {
-                    continue;
-                }
-            }
-
-            std::string cmd;
-            std::size_t M = L + key->size();
-            std::size_t R = line.find(' ', L);
-            if (R == std::string::npos) {
-                if (M != line.size()) {
-                    cmd = line.substr(M);
-                }
-            }
-            else {
-                int S = (int)(R - M);
-                if (S > 0) {
-                    cmd = line.substr(M, S);
-                }
-            }
-            return cmd;
+            line.append(RTrim(LTrim<std::string>(argv[i])));
+            line.append(" ");
         }
-        return "";
+        if (line.empty()) {
+            return "";
+        }
+
+        std::string* key = addressof(key1);
+        std::size_t L = line.find(*key);
+        if (L == std::string::npos) {
+            key = addressof(key2);
+            L = line.find(*key);
+            if (L == std::string::npos) {
+                return "";
+            }
+        }
+
+        if (L) {
+            char ch = line[L - 1];
+            if (ch != ' ') {
+                return "";
+            }
+        }
+
+        std::string cmd;
+        std::size_t M = L + key->size();
+        std::size_t R = line.find(' ', L);
+        if (M >= R) {
+            R = std::string::npos;
+            for (std::size_t I = M, SZ = line.size(); I < SZ; I++) {
+                int ch = line[I];
+                if (ch == ' ') {
+                    R = I;
+                    L = M;
+                    break;
+                }
+            }
+            if (!L || L == std::string::npos) {
+                return "";
+            }
+        }
+
+        if (R == std::string::npos) {
+            if (M != line.size()) {
+                cmd = line.substr(M);
+            }
+        }
+        else {
+            int S = (int)(R - M);
+            if (S > 0) {
+                cmd = line.substr(M, S);
+            }
+        }
+        return cmd;
     }
 
     std::string GetFullExecutionFilePath() noexcept {

@@ -23,6 +23,8 @@ namespace uds {
             using AsyncTcpSocketPtr             = Socket::AsioTcpSocket;
             using AsyncTcpSocket                = boost::asio::ip::tcp::socket;
             using AsyncContextPtr               = std::shared_ptr<boost::asio::io_context>;
+            using AsyncResolverPtr              = std::shared_ptr<boost::asio::ip::tcp::resolver>;
+            using AsyncDeadlineTimerPtr         = std::shared_ptr<boost::asio::deadline_timer>;
             using Stream                        = uds::io::Stream;
             using BinaryReader                  = uds::io::BinaryReader;
             using MemoryStream                  = uds::io::MemoryStream;
@@ -66,10 +68,13 @@ namespace uds {
 
         public:
             static AsyncTcpSocketPtr            NewRemoteSocket(const AppConfigurationPtr& configuration, const AsyncContextPtr& context) noexcept;
+            static AsyncTcpSocketPtr            NewRemoteSocket(const AppConfigurationPtr& configuration, const AsyncContextPtr& context, const boost::asio::ip::tcp::endpoint& remoteEP) noexcept;
 
         private:
-            AsyncTcpSocketPtr                   NewRemoteSocket(boost::asio::ip::tcp::endpoint& remoteEP) noexcept;
-            static AsyncTcpSocketPtr            NewRemoteSocket(const AppConfigurationPtr& configuration, const AsyncContextPtr& context, const boost::asio::ip::tcp::endpoint& remoteEP) noexcept;
+            bool                                EstablishRemoteSocket() noexcept;
+            bool                                KeepAlivedReadCycle(const ITransmissionPtr& transmission) noexcept;
+            bool                                KeepAlivedSendCycle(const ITransmissionPtr& transmission) noexcept;
+            bool                                ConnectRemoteSocket(boost::asio::ip::tcp::endpoint remoteEP) noexcept;
 
         private:
             bool                                RemoteSocketToOutboundSocket() noexcept;
@@ -86,6 +91,8 @@ namespace uds {
             ITransmissionPtr                    outbound_;
             AppConfigurationPtr                 configuration_;
             AsyncTcpSocketPtr                   remote_;
+            AsyncResolverPtr                    resolver_;
+            AsyncDeadlineTimerPtr               timeout_;
             std::shared_ptr<Byte>               buffers_;
         };
     }

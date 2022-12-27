@@ -12,6 +12,7 @@
 #include <uds/transmission/SslWebSocketTransmission.h>
 
 using uds::collections::Dictionary;
+using uds::net::Ipep;
 using uds::net::Socket;
 using uds::net::IPEndPoint;
 using uds::net::AddressFamily;
@@ -74,7 +75,17 @@ namespace uds {
             if (acceptor) {
                 Socket::Closesocket(*acceptor);
             }
+
+            std::shared_ptr<boost::asio::ip::tcp::resolver>& resolver = resolver_;
+            if (resolver) {
+                try {
+                    resolver->cancel();
+                }
+                catch (std::exception&) {}
+            }
+
             acceptor.reset();
+            resolver.reset();
         }
 
         bool Router::Listen() noexcept {
@@ -82,15 +93,25 @@ namespace uds {
                 return false;
             }
 
-            IPEndPoint inboundEP(configuration_->Inbound.IP.data(), configuration_->Inbound.Port);
-            IPEndPoint outboundEP(configuration_->Outbound.IP.data(), configuration_->Outbound.Port);
-            if (inboundEP.IsNone() || outboundEP.IsNone()) {
-                return false;
+            if (!configuration_->Inbound.Domain) {
+                IPEndPoint inboundEP(configuration_->Inbound.IP.data(), configuration_->Inbound.Port);
+                if (inboundEP.IsNone()) {
+                    return false;
+                }
+            }
+
+            if (!configuration_->Outbound.Domain) {
+                IPEndPoint outboundEP(configuration_->Outbound.IP.data(), configuration_->Outbound.Port);
+                if (outboundEP.IsNone()) {
+                    return false;
+                }
             }
 
             IPEndPoint localEP(configuration_->IP.data(), configuration_->Port);
-            if (localEP.IsBroadcast()) {
-                return false;
+            if (IPEndPoint::IsInvalid(localEP)) {
+                if (configuration_->Domain || localEP.IsBroadcast()) {
+                    return false;
+                }
             }
 
             std::shared_ptr<Reference> references = GetReference();
@@ -99,11 +120,34 @@ namespace uds {
                     return AcceptClient(context, socket);
                 });
             if (acceptor_) {
+                resolver_ = make_shared_object<boost::asio::ip::tcp::resolver>(*context_);
                 return true;
             }
 
             CloseAcceptor();
             return false;
+        }
+
+        bool Router::ResolveAddress(bool domain, const std::string& hostname, int port, ResolveAddressAsyncCallback&& callback) noexcept {
+            if (domain) {
+                std::shared_ptr<Reference> references = GetReference();
+                ResolveAddressAsyncCallback scallback = callback;
+                Ipep::GetAddressByHostName(resolver_, hostname, port,
+                    make_shared_object<Ipep::GetAddressByHostNameCallback>(
+                        [scallback, references, this](IPEndPoint* ep) noexcept {
+                            boost::asio::ip::tcp::endpoint remoteEP;
+                            if (ep) {
+                                remoteEP = IPEndPoint::ToEndPoint<boost::asio::ip::tcp>(*ep);
+                            }
+                            scallback(remoteEP);
+                        }));
+                return true;
+            }
+            else {
+                boost::asio::ip::tcp::endpoint remoteEP = IPEndPoint::ToEndPoint<boost::asio::ip::tcp>(IPEndPoint(hostname.data(), port));
+                callback(remoteEP);
+                return true;
+            }
         }
 
         bool Router::AcceptClient(const AsioContext& context, const AsioTcpSocket& socket) noexcept {
@@ -112,31 +156,36 @@ namespace uds {
                     uds::threading::ClearTimeout(constantof(timeout));
                 }
             };
-            static const auto ClearTimeoutIfNotSuccess = [](bool success, const TimeoutPtr& timeout) noexcept {
-                if (!success) {
-                    ClearTimeout(timeout);
-                }
-                return success;
-            };
-            
+
             const std::shared_ptr<Reference> references = GetReference();
             const AsioTcpSocket network = socket;
+            const AsioContext scontext = context;
             const auto timeout = uds::threading::SetTimeout(hosting_,
                 [network, references, this](void* key) noexcept {
                     Socket::Closesocket(network);
                 }, (UInt64)configuration_->Connect.Timeout * 1000);
 
-            return ClearTimeoutIfNotSuccess(ConnectConnection(context, 0,
-                IPEndPoint::ToEndPoint<boost::asio::ip::tcp>(IPEndPoint(configuration_->Inbound.IP.data(), configuration_->Inbound.Port)),
-                [timeout, network, references, this](const ITransmissionPtr& transmission, int channelId) noexcept {
-                    const ITransmissionPtr inbound = transmission;
-                    return ClearTimeoutIfNotSuccess(ConnectConnection(inbound->GetContext(), channelId,
-                        IPEndPoint::ToEndPoint<boost::asio::ip::tcp>(IPEndPoint(configuration_->Outbound.IP.data(), configuration_->Outbound.Port)),
-                        [inbound, timeout, network, references, this](const ITransmissionPtr& outbound, int channelId) noexcept {
-                            ClearTimeout(timeout);
-                            return Accept(network, channelId, inbound, outbound);
-                        }), timeout);
-                }), timeout);
+            return ResolveAddress(configuration_->Inbound.Domain, configuration_->Inbound.IP, configuration_->Inbound.Port,
+                [scontext, timeout, network, references, this](const boost::asio::ip::tcp::endpoint& remoteEP) noexcept {
+                    if (!ConnectConnection(scontext, 0, remoteEP,
+                        [timeout, network, references, this](const ITransmissionPtr& transmission, int channelId) noexcept {
+                            const ITransmissionPtr inbound = transmission;
+                            return ResolveAddress(configuration_->Outbound.Domain, configuration_->Outbound.IP, configuration_->Outbound.Port,
+                                [channelId, inbound, timeout, network, references, this](const boost::asio::ip::tcp::endpoint& remoteEP) noexcept {
+                                    if (!ConnectConnection(inbound->GetContext(), channelId, remoteEP,
+                                        [inbound, timeout, network, references, this](const ITransmissionPtr& outbound, int channelId) noexcept {
+                                            ClearTimeout(timeout);
+                                            return Accept(network, channelId, inbound, outbound);
+                                        })) {
+                                        ClearTimeout(timeout);
+                                        inbound->Close();
+                                    }
+                                });
+                        })) {
+                        ClearTimeout(timeout);
+                        Socket::Closesocket(network);
+                    }
+                });
         }
 
         bool Router::Accept(const AsioTcpSocket& network, int channel, const ITransmissionPtr& inbound, const ITransmissionPtr& outbound) noexcept {
@@ -233,7 +282,7 @@ namespace uds {
         }
 
         bool Router::ConnectClient(const AsioContext& context, const boost::asio::ip::tcp::endpoint& remoteEP, ConnectClientAsyncCallback&& callback) noexcept {
-            const std::shared_ptr<boost::asio::ip::tcp::socket> network = Connection::NewRemoteSocket(configuration_, context);
+            const std::shared_ptr<boost::asio::ip::tcp::socket> network = Connection::NewRemoteSocket(configuration_, context, remoteEP);
             if (!network) {
                 return false;
             }

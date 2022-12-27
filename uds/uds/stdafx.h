@@ -52,6 +52,7 @@
 #include <list>
 #include <map>
 #include <set>
+#include <regex>
 #include <vector>
 #include <fstream>
 #include <unordered_set>

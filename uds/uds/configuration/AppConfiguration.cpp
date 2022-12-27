@@ -1,6 +1,7 @@
 #include <uds/configuration/AppConfiguration.h>
 #include <uds/configuration/Ini.h>
 #include <uds/ssl/SSL.h>
+#include <uds/net/Ipep.h>
 #include <uds/net/IPEndPoint.h>
 #include <uds/threading/Hosting.h>
 #include <uds/cryptography/Encryptor.h>
@@ -157,6 +158,7 @@ namespace uds {
         std::shared_ptr<AppConfiguration> AppConfiguration::LoadIniFile(const std::string& iniFile) noexcept {
             typedef uds::configuration::Ini Ini;
             typedef uds::net::IPEndPoint    IPEndPoint;
+            typedef uds::net::Ipep          Ipep;
 
             std::shared_ptr<Ini> config = Ini::LoadFile(iniFile);
             if (!config) {
@@ -185,10 +187,16 @@ namespace uds {
                 configuration->Turbo = section.GetValue<bool>("turbo");
                 configuration->Connect.Timeout = section.GetValue<int>("connect.timeout");
                 configuration->Handshake.Timeout = section.GetValue<int>("handshake.timeout");
+                configuration->Inbound.Domain = false;
+                configuration->Outbound.Domain = false;
+                configuration->KeepAlived = section.GetValue<bool>("keep-alived");
 
                 IPEndPoint ip(configuration->IP.data(), configuration->Port);
                 if (IPEndPoint::IsInvalid(ip)) {
-                    configuration->IP = boost::asio::ip::address_v6::any().to_string();
+                    configuration->Domain = Ipep::IsDomainAddress(configuration->IP);
+                    if (!configuration->Domain) {
+                        configuration->IP = boost::asio::ip::address_v6::any().to_string();
+                    }
                 }
                 else {
                     configuration->IP = ip.ToAddressString();
@@ -196,7 +204,10 @@ namespace uds {
 
                 IPEndPoint inboundIP(configuration->Inbound.IP.data(), configuration->Inbound.Port);
                 if (IPEndPoint::IsInvalid(inboundIP)) {
-                    configuration->Inbound.IP = boost::asio::ip::address_v6::any().to_string();
+                    configuration->Inbound.Domain = Ipep::IsDomainAddress(configuration->Inbound.IP);
+                    if (!configuration->Inbound.Domain) {
+                        configuration->Inbound.IP = boost::asio::ip::address_v6::any().to_string();
+                    }
                 }
                 else {
                     configuration->Inbound.IP = inboundIP.ToAddressString();
@@ -204,7 +215,10 @@ namespace uds {
 
                 IPEndPoint outboundIP(configuration->Outbound.IP.data(), configuration->Outbound.Port);
                 if (IPEndPoint::IsInvalid(outboundIP)) {
-                    configuration->Outbound.IP = boost::asio::ip::address_v6::any().to_string();
+                    configuration->Outbound.Domain = Ipep::IsDomainAddress(configuration->Outbound.IP);
+                    if (!configuration->Outbound.Domain) {
+                        configuration->Outbound.IP = boost::asio::ip::address_v6::any().to_string();
+                    }
                 }
                 else {
                     configuration->Outbound.IP = outboundIP.ToAddressString();
@@ -353,29 +367,32 @@ namespace uds {
                 return true;
             }
             elif(config.Mode == LoopbackMode::LoopbackMode_Client) {
-                if (IPEndPoint(config.IP.data(), config.Port).IsBroadcast()) {
-                    return false;
+                IPEndPoint localEP(config.IP.data(), config.Port);
+                if (IPEndPoint::IsInvalid(localEP)) {
+                    if (config.Domain || localEP.IsBroadcast()) {
+                        return true;
+                    }
                 }
 
-                if (IPEndPoint::IsInvalid(IPEndPoint(config.Inbound.IP.data(), config.Inbound.Port))) {
-                    return false;
+                if (!config.Inbound.Domain && IPEndPoint::IsInvalid(IPEndPoint(config.Inbound.IP.data(), config.Inbound.Port))) {
+                    return true;
                 }
 
-                if (IPEndPoint::IsInvalid(IPEndPoint(config.Outbound.IP.data(), config.Outbound.Port))) {
-                    return false;
+                if (!config.Outbound.Domain && IPEndPoint::IsInvalid(IPEndPoint(config.Outbound.IP.data(), config.Outbound.Port))) {
+                    return true;
                 }
             }
             else {
-                if (IPEndPoint::IsInvalid(IPEndPoint(config.IP.data(), config.Port))) {
-                    return false;
+                if (!config.Domain && IPEndPoint::IsInvalid(IPEndPoint(config.IP.data(), config.Port))) {
+                    return true;
                 }
 
-                if (IPEndPoint(config.Inbound.IP.data(), config.Inbound.Port).IsBroadcast()) {
-                    return false;
+                if (config.Inbound.Domain || IPEndPoint(config.Inbound.IP.data(), config.Inbound.Port).IsBroadcast()) {
+                    return true;
                 }
 
-                if (IPEndPoint(config.Outbound.IP.data(), config.Outbound.Port).IsBroadcast()) {
-                    return false;
+                if (config.Outbound.Domain || IPEndPoint(config.Outbound.IP.data(), config.Outbound.Port).IsBroadcast()) {
+                    return true;
                 }
             }
 
@@ -402,16 +419,16 @@ namespace uds {
             }
 
             if (config.Alignment < (UINT8_MAX << 1) || config.Alignment > uds::threading::Hosting::BufferSize) {
-                return false;
+                return true;
             }
 
             if (config.Connect.Timeout < 1) {
-                return false;
+                return true;
             }
 
             if (config.Mode == LoopbackMode::LoopbackMode_Server) {
                 if (config.Handshake.Timeout < 1) {
-                    return false;
+                    return true;
                 }
             }
             return false;

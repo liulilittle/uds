@@ -18,17 +18,18 @@ namespace uds {
             static std::string                                                  ToIpepAddress(const IPEndPoint* ep) noexcept;
             static bool                                                         SetDnsAddresses(const std::vector<std::string>& addresses) noexcept;
             static bool                                                         ToEndPoint(const std::string& addresses, std::vector<std::string>& out) noexcept;
+            static bool                                                         IsDomainAddress(const std::string& domain) noexcept;
 
         public:
             template<class TProtocol>
-            inline static void                                                  GetAddressByHostName(const std::shared_ptr<boost::asio::ip::basic_resolver<TProtocol> >& resolver, const std::string& hostname, int port, const std::shared_ptr<GetAddressByHostNameCallback>& callback) noexcept {
+            inline static void                                                  GetAddressByHostName(const std::shared_ptr<boost::asio::ip::basic_resolver<TProtocol> >& resolver, const std::string& hostname, int port, const std::shared_ptr<GetAddressByHostNameCallback>& callback) {
                 if (NULL == resolver) {
                     throw std::runtime_error("Argument \"resolver\" is not allowed to be a NULL references.");
                 }
                 GetAddressByHostName(*resolver, hostname, port, callback);
             }
             template<class TProtocol>
-            inline static void                                                  GetAddressByHostName(boost::asio::ip::basic_resolver<TProtocol>& resolver, const std::string& hostname, int port, const std::shared_ptr<GetAddressByHostNameCallback>& callback) noexcept {
+            inline static void                                                  GetAddressByHostName(boost::asio::ip::basic_resolver<TProtocol>& resolver, const std::string& hostname, int port, const std::shared_ptr<GetAddressByHostNameCallback>& callback) {
                 if (NULL == callback) {
                     throw std::runtime_error("Argument \"callback\" is not allowed to be a NULL references.");
                 }
@@ -58,14 +59,14 @@ namespace uds {
                     }));
             }
             template<class TProtocol>
-            inline static void                                                  GetAddressesByHostName(const std::shared_ptr<boost::asio::ip::basic_resolver<TProtocol> >& resolver, const std::string& hostname, int port, const std::shared_ptr<GetAddressesByHostNameCallback>& callback) noexcept {
+            inline static void                                                  GetAddressesByHostName(const std::shared_ptr<boost::asio::ip::basic_resolver<TProtocol> >& resolver, const std::string& hostname, int port, const std::shared_ptr<GetAddressesByHostNameCallback>& callback) {
                 if (NULL == resolver) {
                     throw std::runtime_error("Argument \"resolver\" is not allowed to be a NULL references.");
                 }
                 GetAddressesByHostName(*resolver, hostname, port, callback);
             }
             template<class TProtocol>
-            inline static void                                                  GetAddressesByHostName(boost::asio::ip::basic_resolver<TProtocol>& resolver, const std::string& hostname, int port, const std::shared_ptr<GetAddressesByHostNameCallback>& callback) noexcept {
+            inline static void                                                  GetAddressesByHostName(boost::asio::ip::basic_resolver<TProtocol>& resolver, const std::string& hostname, int port, const std::shared_ptr<GetAddressesByHostNameCallback>& callback) {
                 typedef boost::asio::ip::basic_resolver<TProtocol> protocol_resolver;
 
                 if (NULL == callback) {

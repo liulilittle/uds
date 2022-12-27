@@ -1,3 +1,5 @@
+#include <uds/threading/Timer.h>
+#include <uds/net/Ipep.h>
 #include <uds/tunnel/Connection.h>
 
 namespace uds {
@@ -18,6 +20,8 @@ namespace uds {
         }
 
         bool Connection::Listen(const AsyncTcpSocketPtr& network) noexcept {
+            typedef uds::net::Ipep Ipep;
+
             if (disposed_ || buffers_) {
                 return false;
             }
@@ -25,31 +29,68 @@ namespace uds {
             buffers_ = make_shared_alloc<Byte>(ECONNECTION_MSS);
             if (network) {
                 remote_ = network;
-                available_ = InboundSocketToRemoteSocket() && RemoteSocketToOutboundSocket();
+                available_ = EstablishRemoteSocket();
                 return available_;
             }
             else {
-                boost::asio::ip::tcp::endpoint remoteEP;
-                const AsyncTcpSocketPtr socket = NewRemoteSocket(remoteEP);
-                if (!socket) {
+                const AsyncContextPtr context = GetContext();
+                if (IsNone() || remote_ || !context) {
                     return false;
                 }
 
-                const std::shared_ptr<Reference> references = GetReference();
-                socket->async_connect(remoteEP,
-                    [references, this](const boost::system::error_code& ec) noexcept {
-                        if (!ec) {
-                            available_ = InboundSocketToRemoteSocket() && RemoteSocketToOutboundSocket();
-                        }
-
-                        if (!available_) {
-                            Close();
-                        }
-                    });
-
-                remote_ = std::move(socket);
-                return true;
+                resolver_ = make_shared_object<boost::asio::ip::tcp::resolver>(*context);
+                if (!resolver_) {
+                    return false;
+                }
+                elif(configuration_->Domain) {
+                    const std::shared_ptr<Reference> references = GetReference();
+                    Ipep::GetAddressByHostName(resolver_, configuration_->IP, configuration_->Port,
+                        make_shared_object<Ipep::GetAddressByHostNameCallback>(
+                            [references, this](IPEndPoint* ep) noexcept {
+                                boost::asio::ip::tcp::endpoint remoteEP;
+                                if (ep) {
+                                    remoteEP = IPEndPoint::ToEndPoint<boost::asio::ip::tcp>(*ep);
+                                }
+                                ConnectRemoteSocket(remoteEP);
+                            }));
+                    return true;
+                }
+                else {
+                    boost::asio::ip::tcp::endpoint remoteEP = IPEndPoint::ToEndPoint<boost::asio::ip::tcp>(IPEndPoint(configuration_->IP.data(), configuration_->Port));
+                    return ConnectRemoteSocket(remoteEP);
+                }
             }
+        }
+
+        bool Connection::EstablishRemoteSocket() noexcept {
+            bool available = InboundSocketToRemoteSocket() && RemoteSocketToOutboundSocket();
+            if (available) {
+                if (configuration_->KeepAlived) {
+                    available = KeepAlivedReadCycle(outbound_) && KeepAlivedSendCycle(inbound_);
+                }
+            }
+            return available;
+        }
+
+        bool Connection::ConnectRemoteSocket(boost::asio::ip::tcp::endpoint remoteEP) noexcept {
+            const AsyncTcpSocketPtr socket = NewRemoteSocket(configuration_, GetContext(), remoteEP);
+            if (!socket) {
+                return false;
+            }
+
+            const std::shared_ptr<Reference> references = GetReference();
+            socket->async_connect(remoteEP,
+                [references, this](const boost::system::error_code& ec) noexcept {
+                    if (!ec) {
+                        available_ = EstablishRemoteSocket();
+                    }
+
+                    if (!available_) {
+                        Close();
+                    }
+                });
+            remote_ = std::move(socket);
+            return true;
         }
 
         Connection::AsyncContextPtr Connection::GetContext() noexcept {
@@ -69,7 +110,7 @@ namespace uds {
             if (!configuration) {
                 return NULL;
             }
-            
+
             boost::system::error_code ec;
             boost::asio::ip::address address = boost::asio::ip::address::from_string(configuration->Inbound.IP, ec);
             if (ec || address.is_unspecified() || address.is_multicast()) {
@@ -99,7 +140,7 @@ namespace uds {
             if (!socket) {
                 return NULL;
             }
-            
+
             boost::system::error_code ec;
             if (address.is_v4()) {
                 socket->open(boost::asio::ip::tcp::v4(), ec);
@@ -121,21 +162,6 @@ namespace uds {
             socket->set_option(boost::asio::ip::tcp::no_delay(configuration->Turbo), ec);
             socket->set_option(boost::asio::detail::socket_option::boolean<IPPROTO_TCP, TCP_FASTOPEN>(configuration->FastOpen), ec);
             return std::move(socket);
-        }
-
-        Connection::AsyncTcpSocketPtr Connection::NewRemoteSocket(boost::asio::ip::tcp::endpoint& remoteEP) noexcept {
-            if (IsNone() || remote_) {
-                return NULL;
-            }
-
-            boost::system::error_code ec;
-            boost::asio::ip::address address = boost::asio::ip::address::from_string(configuration_->IP, ec);
-            if (ec || address.is_unspecified() || address.is_multicast()) {
-                return NULL;
-            }
-
-            remoteEP = boost::asio::ip::tcp::endpoint(address, configuration_->Port);
-            return NewRemoteSocket(configuration_, GetContext(), remoteEP);
         }
 
         bool Connection::IsNone() noexcept {
@@ -176,10 +202,20 @@ namespace uds {
                     Socket::Closesocket(*remote);
                 }
 
+                const std::shared_ptr<boost::asio::ip::tcp::resolver> resolver = std::move(resolver_);
+                if (resolver) {
+                    try {
+                        resolver->cancel();
+                    }
+                    catch (std::exception&) {}
+                }
+
                 buffers_.reset();
                 remote_.reset();
                 inbound_.reset();
                 outbound_.reset();
+                resolver_.reset();
+                uds::threading::ClearTimeout(timeout_);
 
                 DisposedEventHandler disposedEvent = std::move(DisposedEvent);
                 if (disposedEvent) {
@@ -227,7 +263,7 @@ namespace uds {
 
             const std::shared_ptr<Reference> references = GetReference();
             return socket->ReadAsync(
-                [references, this, socket](const std::shared_ptr<Byte>& buffers, int length) {
+                [references, this, socket](const std::shared_ptr<Byte>& buffers, int length) noexcept {
                     if (!SendToRemoteSocket(buffers.get(), length)) {
                         Close();
                     }
@@ -352,7 +388,7 @@ namespace uds {
             if (!stream.CanWrite()) {
                 return false;
             }
-            
+
             Char messages[uds::threading::Hosting::BufferSize];
             int messages_size = RandomNext(UINT8_MAX << 1, std::min<int>(alignment, sizeof(messages)));
             for (int i = 0; i < messages_size; i++) {
@@ -389,7 +425,7 @@ namespace uds {
             if (13 >= messages_size) {
                 return 0;
             }
-            
+
             char id[8];
             memcpy(id, data + 5, sizeof(id));
 
@@ -397,6 +433,70 @@ namespace uds {
             channelid ^= messages_size << 16 | messages_size;
 
             return channelid << 32 | messages_size;
+        }
+
+        bool Connection::KeepAlivedReadCycle(const ITransmissionPtr& transmission) noexcept {
+            if (disposed_ || !transmission) {
+                return false;
+            }
+
+            const std::shared_ptr<Reference> references = GetReference();
+            const ITransmissionPtr network = transmission;
+            return network->ReadAsync(
+                [network, references, this](const std::shared_ptr<Byte>& buffers, int length) noexcept {
+                    if (length < 1) {
+                        Close();
+                    }
+                    else {
+                        KeepAlivedReadCycle(network);
+                    }
+                });
+        }
+
+        bool Connection::KeepAlivedSendCycle(const ITransmissionPtr& transmission) noexcept {
+            if (disposed_ || !transmission) {
+                return false;
+            }
+
+            const AsyncContextPtr context = GetContext();
+            if (!context) {
+                return false;
+            }
+
+            const std::shared_ptr<Reference> references = GetReference();
+            const ITransmissionPtr network = transmission;
+
+            timeout_ = uds::threading::SetTimeout(context,
+                [references, this, network](void*) noexcept {
+                    uds::threading::ClearTimeout(timeout_);
+                    std::shared_ptr<Byte> messages = make_shared_alloc<Byte>(64);
+                    if (!messages) {
+                        Close();
+                        return false;
+                    }
+
+                    Byte* packet = messages.get();
+                    int packet_size = RandomNext(8, 64);
+                    for (int i = 0; i < packet_size; i++) {
+                        packet[i] = RandomAscii();
+                    }
+
+                    if (!network->WriteAsync(messages, 0, packet_size,
+                        [references, this, network](bool success) noexcept {
+                            if (success) {
+                                success = KeepAlivedSendCycle(network);
+                            }
+
+                            if (!success) {
+                                Close();
+                            }
+                        })) {
+                        Close();
+                        return false;
+                    }
+                    return true;
+                }, RandomNext(100, 500));
+            return NULL != timeout_;
         }
     }
 }

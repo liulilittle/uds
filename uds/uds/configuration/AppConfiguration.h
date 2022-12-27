@@ -16,15 +16,17 @@ namespace uds {
             LoopbackMode                                Mode = LoopbackMode::LoopbackMode_Client;
             std::string                                 IP;
             int                                         Port = 0;
-            struct
-            {
+            bool                                        Domain = false;
+            struct {
                 std::string                             IP;
                 int                                     Port = 0;
+                bool                                    Domain = false;
             }                                           Inbound, Outbound;
             int                                         Alignment = 0;
             int                                         Backlog = 511;
             bool                                        FastOpen = false;
             bool                                        Turbo = false;
+            bool                                        KeepAlived = false;
             struct {
                 int                                     Timeout = 10;
             }                                           Connect;

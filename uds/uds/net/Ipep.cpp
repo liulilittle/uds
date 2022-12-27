@@ -108,5 +108,18 @@ namespace uds {
             }
             return localEP;
         }
+
+        bool Ipep::IsDomainAddress(const std::string& domain) noexcept {
+            if (domain.empty()) {
+                return false;
+            }
+            elif(domain == "localhost") {
+                return true;
+            }
+            else {
+                static std::regex pattern("^(?=^.{3,255}$)[a-zA-Z0-9][-a-zA-Z0-9]{0,63}(\\.[a-zA-Z0-9][-a-zA-Z0-9]{0,63})+$");
+                return std::regex_match(domain, pattern);
+            }
+        }
     }
 }
