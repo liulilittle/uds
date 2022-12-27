@@ -465,10 +465,16 @@ namespace uds {
 
             const std::shared_ptr<Reference> references = GetReference();
             const ITransmissionPtr network = transmission;
+            if (timeout_) {
+                uds::threading::ClearTimeout(timeout_);
+            }
 
             timeout_ = uds::threading::SetTimeout(context,
                 [references, this, network](void*) noexcept {
-                    uds::threading::ClearTimeout(timeout_);
+                    if (timeout_) {
+                        uds::threading::ClearTimeout(timeout_);
+                    }
+
                     std::shared_ptr<Byte> messages = make_shared_alloc<Byte>(64);
                     if (!messages) {
                         Close();
