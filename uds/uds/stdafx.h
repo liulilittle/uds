@@ -2,14 +2,14 @@
 
 #include <stdio.h>
 
+#ifdef _WIN64
+#define _WIN32 1
+#endif
+
 #ifdef _WIN32
 #include <io.h>
 #else
 #include <unistd.h>
-#endif
-
-#ifdef _WIN64
-#define _WIN32 1
 #endif
 
 #ifndef R_OK
