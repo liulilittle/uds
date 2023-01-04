@@ -156,6 +156,17 @@ namespace uds {
                     uds::threading::ClearTimeout(constantof(timeout));
                 }
             };
+            static const auto CloseIfNotSuccess = [](bool success, const TimeoutPtr& timeout, const AsioTcpSocket& network, const ITransmissionPtr& inbound, const ITransmissionPtr& outbound) noexcept {
+                if (!success) {
+                    ClearTimeout(timeout);
+                    if (outbound) {
+                        outbound->Close();
+                    }
+                    inbound->Close();
+                    Socket::Closesocket(network);
+                }
+                return success;
+            };
 
             const std::shared_ptr<Reference> references = GetReference();
             const AsioTcpSocket network = socket;
@@ -175,7 +186,7 @@ namespace uds {
                                     if (!ConnectConnection(inbound->GetContext(), channelId, remoteEP,
                                         [inbound, timeout, network, references, this](const ITransmissionPtr& transmission, int channelId) noexcept {
                                             ITransmissionPtr outbound = transmission;
-                                            return Connection::HelloAsync(outbound,
+                                            return CloseIfNotSuccess(Connection::HelloAsync(outbound,
                                                 [channelId, inbound, outbound, timeout, network, references, this](bool success) noexcept {
                                                     ClearTimeout(timeout);
                                                     if (success) {
@@ -186,13 +197,8 @@ namespace uds {
                                                             success = Accept(network, channelId, inbound, outbound);
                                                         }
                                                     }
-
-                                                    if (!success) {
-                                                        inbound->Close();
-                                                        outbound->Close();
-                                                        Socket::Closesocket(network);
-                                                    }
-                                                });
+                                                    CloseIfNotSuccess(success, timeout, network, inbound, outbound);
+                                                }), timeout, network, inbound, outbound);
                                         })) {
                                         ClearTimeout(timeout);
                                         inbound->Close();
