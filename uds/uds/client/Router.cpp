@@ -173,9 +173,26 @@ namespace uds {
                             return ResolveAddress(configuration_->Outbound.Domain, configuration_->Outbound.IP, configuration_->Outbound.Port,
                                 [channelId, inbound, timeout, network, references, this](const boost::asio::ip::tcp::endpoint& remoteEP) noexcept {
                                     if (!ConnectConnection(inbound->GetContext(), channelId, remoteEP,
-                                        [inbound, timeout, network, references, this](const ITransmissionPtr& outbound, int channelId) noexcept {
-                                            ClearTimeout(timeout);
-                                            return Accept(network, channelId, inbound, outbound);
+                                        [inbound, timeout, network, references, this](const ITransmissionPtr& transmission, int channelId) noexcept {
+                                            ITransmissionPtr outbound = transmission;
+                                            return Connection::HelloAsync(outbound,
+                                                [channelId, inbound, outbound, timeout, network, references, this](bool success) noexcept {
+                                                    ClearTimeout(timeout);
+                                                    if (success) {
+                                                        if (channelId >> 31) {
+                                                            success = Accept(network, channelId, outbound, inbound);
+                                                        }
+                                                        else {
+                                                            success = Accept(network, channelId, inbound, outbound);
+                                                        }
+                                                    }
+
+                                                    if (!success) {
+                                                        inbound->Close();
+                                                        outbound->Close();
+                                                        Socket::Closesocket(network);
+                                                    }
+                                                });
                                         })) {
                                         ClearTimeout(timeout);
                                         inbound->Close();

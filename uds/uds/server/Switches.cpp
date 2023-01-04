@@ -20,7 +20,7 @@ namespace uds {
     namespace server {
         Switches::Switches(const std::shared_ptr<uds::threading::Hosting>& hosting, const std::shared_ptr<uds::configuration::AppConfiguration>& configuration) noexcept
             : disposed_(false)
-            , channel_(0)
+            , channel_(RandomNext(1, INT_MAX))
             , hosting_(hosting)
             , configuration_(configuration) {
             if (hosting) {
@@ -140,6 +140,7 @@ namespace uds {
                                 ClearTimeout(key);
                                 outbound->Close();
                             }, (UInt64)configuration_->Connect.Timeout * 1000));
+                        handshaked = handshaked && Connection::HelloAsync(outbound);
                         handshaked = handshaked && Connection::AcceptAsync(transmission,
                             [references, this, outbound](bool success, int channelId) noexcept -> void {
                                 ClearTimeout(outbound.get());
@@ -181,7 +182,8 @@ namespace uds {
 
             for (;;) {
                 int channelId = ++channel_;
-                if (!channelId) {
+                if (channelId < 1) {
+                    channel_ = 0;
                     continue;
                 }
 
@@ -194,6 +196,12 @@ namespace uds {
                     continue;
                 }
 
+                if (configuration_->Inversion) {
+                    int inversion = RandomNext() & 1;
+                    if (inversion) {
+                        channelId |= (int)(1 << 31);
+                    }
+                }
                 channel->channel_ = channelId;
                 channel->inbound_ = inbound;
                 channel->network_ = network;
@@ -243,10 +251,15 @@ namespace uds {
             if (!link) {
                 return false;
             }
-            
+
             bool success = ClearTimeout(link->network_.get());
             if (success) {
-                success = Accept(channel, link->inbound_, outbound);
+                if (channel >> 31) {
+                    success = Accept(channel, outbound, link->inbound_);
+                }
+                else {
+                    success = Accept(channel, link->inbound_, outbound);
+                }
             }
 
             if (!success) {

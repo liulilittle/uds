@@ -185,6 +185,7 @@ namespace uds {
                 configuration->Outbound.Port = section.GetValue<int>("outbound-port");
                 configuration->FastOpen = section.GetValue<bool>("fast-open");
                 configuration->Turbo = section.GetValue<bool>("turbo");
+                configuration->Inversion = section.GetValue<bool>("inversion");
                 configuration->Connect.Timeout = section.GetValue<int>("connect.timeout");
                 configuration->Handshake.Timeout = section.GetValue<int>("handshake.timeout");
                 configuration->Inbound.Domain = false;

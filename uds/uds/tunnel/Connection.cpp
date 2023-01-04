@@ -355,6 +355,10 @@ namespace uds {
                     }
 
                     int channelId = (int)(v >> 32);
+                    if (!channelId) {
+                        callback(false, 0);
+                        return;
+                    }
                     callback(true, channelId);
                 });
         }
@@ -382,6 +386,37 @@ namespace uds {
 
         bool Connection::ConnectAsync(const ITransmissionPtr& inbound, ConnectAsyncCallback&& handler) noexcept {
             return HandshakeClient(inbound, std::forward<ConnectAsyncCallback>(handler));
+        }
+
+        bool Connection::HelloAsync(const ITransmissionPtr& outbound) noexcept {
+            if (!outbound) {
+                return false;
+            }
+
+            ITransmissionPtr transmission = outbound;
+            return HandshakeServer(outbound, UINT8_MAX << 1, RandomNext(1, INT_MAX),
+                [transmission](bool success, int) noexcept {
+                    if (!success) {
+                        transmission->Close();
+                    }
+                });
+        }
+
+        bool Connection::HelloAsync(const ITransmissionPtr& inbound, HelloAsyncCallback&& handler) noexcept {
+            if (!inbound || !handler) {
+                return false;
+            }
+
+            HelloAsyncCallback callback = handler;
+            ITransmissionPtr transmission = inbound;
+
+            return HandshakeClient(inbound,
+                [transmission, callback](bool success, int) noexcept {
+                    if (!success) {
+                        transmission->Close();
+                    }
+                    callback(success);
+                });
         }
 
         bool Connection::PackPlaintextHeaders(Stream& stream, int channelId, int alignment) noexcept {

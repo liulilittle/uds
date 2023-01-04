@@ -1,4 +1,5 @@
 #include <uds/stdafx.h>
+#include <uds/Random.h>
 #include <uds/io/File.h>
 
 #ifdef _WIN32
@@ -13,6 +14,8 @@
 #endif
 
 namespace uds {
+    static Random GLOBAL_RANDOBJECT;
+
     void SetThreadPriorityToMaxLevel() noexcept {
 #ifdef _WIN32
         SetThreadPriority(GetCurrentProcess(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -66,15 +69,6 @@ namespace uds {
             return false;
         }
         return true;
-    }
-
-    Char RandomAscii() noexcept {
-        static const int m_ = 3;
-        static Byte x_[m_] = { 'a', 'A', '0' };
-        static Byte y_[m_] = { 'z', 'Z', '9' };
-
-        int i_ = abs(RandomNext()) % m_;
-        return (Char)RandomNext(x_[i_], y_[i_]);
     }
 
     int GetHashCode(const char* s, int len) noexcept {
@@ -135,45 +129,25 @@ namespace uds {
         return (int)num;
     }
 
-    int RandomNext() noexcept {
-        return RandomNext(0, INT_MAX);
+    Char RandomAscii() noexcept {
+        static const int m_ = 3;
+        static Byte x_[m_] = { 'a', 'A', '0' };
+        static Byte y_[m_] = { 'z', 'Z', '9' };
+
+        int i_ = abs(GLOBAL_RANDOBJECT.Next()) % m_;
+        return (Char)GLOBAL_RANDOBJECT.Next(x_[i_], y_[i_]);
     }
 
-    int RandomNext_r(volatile unsigned int* seed) noexcept {
-        unsigned int next = *seed;
-        int result;
-
-        next *= 1103515245;
-        next += 12345;
-        result = (unsigned int)(next / 65536) % 2048;
-
-        next *= 1103515245;
-        next += 12345;
-        result <<= 10;
-        result ^= (unsigned int)(next / 65536) % 1024;
-
-        next *= 1103515245;
-        next += 12345;
-        result <<= 10;
-        result ^= (unsigned int)(next / 65536) % 1024;
-
-        *seed = next;
-        return result;
+    int RandomNext() noexcept {
+        return GLOBAL_RANDOBJECT.Next(0, INT_MAX);
     }
 
     int RandomNext(int minValue, int maxValue) noexcept {
-        static volatile unsigned int seed = time(NULL);
-
-        int v = RandomNext_r(&seed);
-        return v % (maxValue - minValue + 1) + minValue;
+        return GLOBAL_RANDOBJECT.Next(minValue, maxValue);
     }
 
     double RandomNextDouble() noexcept {
-        double d;
-        int* p = (int*)&d;
-        *p++ = RandomNext();
-        *p++ = RandomNext();
-        return d;
+        return GLOBAL_RANDOBJECT.NextDouble();
     }
 
     std::string StrFormatByteSize(Int64 size) noexcept {

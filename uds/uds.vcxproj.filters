@@ -185,6 +185,9 @@
     <ClInclude Include="uds\client\Router.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="uds\Random.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="udsc.ini" />

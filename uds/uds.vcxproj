@@ -193,6 +193,7 @@
     <ClInclude Include="uds\net\IPEndPoint.h" />
     <ClInclude Include="uds\net\Ipep.h" />
     <ClInclude Include="uds\net\Socket.h" />
+    <ClInclude Include="uds\Random.h" />
     <ClInclude Include="uds\Reference.h" />
     <ClInclude Include="uds\server\Switches.h" />
     <ClInclude Include="uds\ssl\root_certificates.hpp" />
