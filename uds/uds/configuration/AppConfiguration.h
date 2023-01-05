@@ -24,7 +24,6 @@ namespace uds {
             }                                           Inbound, Outbound;
             int                                         Alignment = 0;
             int                                         Backlog = 511;
-            bool                                        Inversion = false;
             bool                                        FastOpen = false;
             bool                                        Turbo = false;
             bool                                        KeepAlived = false;

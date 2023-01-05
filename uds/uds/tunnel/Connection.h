@@ -34,7 +34,6 @@ namespace uds {
             using AcceptAsyncCallback           = std::function<void(bool, int)>;
             using AcceptAsyncMeasureChannelId   = std::function<int(const ITransmissionPtr&)>;
             using ConnectAsyncCallback          = AcceptAsyncCallback;
-            using HelloAsyncCallback            = std::function<void(bool)>;
 
         public:
             const int                           ECONNECTION_MSS = uds::threading::Hosting::BufferSize;
@@ -55,8 +54,6 @@ namespace uds {
             static bool                         AcceptAsync(const ITransmissionPtr& outbound, AcceptAsyncCallback&& handler) noexcept;
             static bool                         ConnectAsync(const ITransmissionPtr& outbound, int alignment, int channelId, ConnectAsyncCallback&& handler) noexcept;
             static bool                         ConnectAsync(const ITransmissionPtr& inbound, ConnectAsyncCallback&& handler) noexcept;
-            static bool                         HelloAsync(const ITransmissionPtr& outbound) noexcept;
-            static bool                         HelloAsync(const ITransmissionPtr& inbound, HelloAsyncCallback&& handler) noexcept;
 
         private:
             static bool                         PackPlaintextHeaders(Stream& stream, int channelId, int alignment) noexcept;

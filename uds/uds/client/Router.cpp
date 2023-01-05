@@ -156,17 +156,6 @@ namespace uds {
                     uds::threading::ClearTimeout(constantof(timeout));
                 }
             };
-            static const auto CloseIfNotSuccess = [](bool success, const TimeoutPtr& timeout, const AsioTcpSocket& network, const ITransmissionPtr& inbound, const ITransmissionPtr& outbound) noexcept {
-                if (!success) {
-                    ClearTimeout(timeout);
-                    if (outbound) {
-                        outbound->Close();
-                    }
-                    inbound->Close();
-                    Socket::Closesocket(network);
-                }
-                return success;
-            };
 
             const std::shared_ptr<Reference> references = GetReference();
             const AsioTcpSocket network = socket;
@@ -184,21 +173,9 @@ namespace uds {
                             return ResolveAddress(configuration_->Outbound.Domain, configuration_->Outbound.IP, configuration_->Outbound.Port,
                                 [channelId, inbound, timeout, network, references, this](const boost::asio::ip::tcp::endpoint& remoteEP) noexcept {
                                     if (!ConnectConnection(inbound->GetContext(), channelId, remoteEP,
-                                        [inbound, timeout, network, references, this](const ITransmissionPtr& transmission, int channelId) noexcept {
-                                            ITransmissionPtr outbound = transmission;
-                                            return CloseIfNotSuccess(Connection::HelloAsync(outbound,
-                                                [channelId, inbound, outbound, timeout, network, references, this](bool success) noexcept {
-                                                    ClearTimeout(timeout);
-                                                    if (success) {
-                                                        if (channelId >> 31) {
-                                                            success = Accept(network, channelId, outbound, inbound);
-                                                        }
-                                                        else {
-                                                            success = Accept(network, channelId, inbound, outbound);
-                                                        }
-                                                    }
-                                                    CloseIfNotSuccess(success, timeout, network, inbound, outbound);
-                                                }), timeout, network, inbound, outbound);
+                                        [inbound, timeout, network, references, this](const ITransmissionPtr& outbound, int channelId) noexcept {
+                                            ClearTimeout(timeout);
+                                            return Accept(network, channelId, inbound, outbound);
                                         })) {
                                         ClearTimeout(timeout);
                                         inbound->Close();
